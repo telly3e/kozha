@@ -220,8 +220,10 @@ const ChartLegendContent = React.forwardRef<
     Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
       hideIcon?: boolean
       nameKey?: string
+      hiddenKeys?: Set<string>
+      onClickLegend?: (dataKey: string) => void
     }
->(({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey }, ref) => {
+>(({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey, hiddenKeys, onClickLegend }, ref) => {
   const { config } = useChart()
 
   if (!payload?.length) {
@@ -233,20 +235,30 @@ const ChartLegendContent = React.forwardRef<
       {payload.map((item) => {
         const key = `${nameKey || item.dataKey || "value"}`
         const itemConfig = getPayloadConfigFromPayload(config, item, key)
+        const dataKey = `${item.dataKey || item.value}`
+        const isHidden = hiddenKeys?.has(dataKey)
 
         return (
-          <div key={item.value} className={cn("flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground")}>
+          <div
+            key={item.value}
+            className={cn(
+              "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
+              onClickLegend && "cursor-pointer select-none",
+              isHidden && "text-muted-foreground/50 line-through",
+            )}
+            onClick={() => onClickLegend?.(dataKey)}
+          >
             {itemConfig?.icon && !hideIcon ? (
               <itemConfig.icon />
             ) : (
               <div
                 className="h-2 w-2 shrink-0 rounded-[2px]"
                 style={{
-                  backgroundColor: item.color,
+                  backgroundColor: isHidden ? "hsl(var(--muted-foreground) / 0.3)" : item.color,
                 }}
               />
             )}
-            {itemConfig?.label}
+            <span className={cn(isHidden && "text-muted-foreground/50")}>{itemConfig?.label}</span>
           </div>
         )
       })}
