@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import "country-flag-icons/3x2/flags.css"
 import getUnicodeFlagIcon from "country-flag-icons/unicode"
 import { useEffect, useState } from "react"
 
@@ -7,6 +8,7 @@ export default function ServerFlag({ country_code, className }: { country_code: 
 
   // @ts-expect-error ForceUseSvgFlag is a global variable
   const forceUseSvgFlag = window.ForceUseSvgFlag as boolean
+  const countryCode = country_code?.toUpperCase()
 
   useEffect(() => {
     if (forceUseSvgFlag) {
@@ -35,8 +37,12 @@ export default function ServerFlag({ country_code, className }: { country_code: 
   if (!country_code) return null
 
   return (
-    <span className={cn("text-[12px] text-muted-foreground", className)}>
-      {forceUseSvgFlag || !supportsEmojiFlags ? <span className={`fi fi-${country_code}`} /> : getUnicodeFlagIcon(country_code)}
+    <span className={cn("inline-flex items-center text-[12px] text-muted-foreground", className)}>
+      {forceUseSvgFlag || !supportsEmojiFlags ? (
+        <span className={cn(`flag:${countryCode}`, "rounded-[2px]")} />
+      ) : (
+        getUnicodeFlagIcon(countryCode)
+      )}
     </span>
   )
 }

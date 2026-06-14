@@ -1,10 +1,10 @@
 {
-  "name": "Nezha Monitoring",
-  "short_name": "Nezha Monitoring",
+"name": "Komari",
+"short_name": "Komari",
   "icons": [
     {
-      "src": "/android-chrome-192x192.png",
-      "sizes": "192x192",
+    "src": "/android-chrome-500x500.png",
+    "sizes": "500x500",
       "type": "image/png",
       "purpose": "any maskable"
     }

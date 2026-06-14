@@ -1,10 +1,10 @@
 {
-    "name": "nezha-BITJEBE",
-    "short": "nezha-BITJEBE",
-    "description": "nezha-BITJEBE Theme for Komari Monitor",
-    "version": "1.1.4",
-    "author": "BITJEBE",
-    "url": "https://github.com/BITJEBE/nezha-BITJEBE",
+    "name": "kozha",
+    "short": "kozha",
+    "description": "A better nezha Theme for Komari Monitor",
+    "version": "1.1.5",
+    "author": "telly3e",
+    "url": "https://github.com/telly3e/kozha",
     "preview": "preview.png",
     "configuration": {
         "type": "managed",
@@ -19,6 +19,13 @@
                 "type": "input",
                 "default": "",
                 "help": "桌面端背景图片URL，留空则不显示背景图。支持图片直链或随机图API。"
+            },
+            {
+                "key": "EnableAnimatedAuroraBackground",
+                "name": "动态极光背景",
+                "type": "switch",
+                "default": true,
+                "help": "开启后在未设置背景图片时显示内置动态极光背景，暗色模式使用霓虹粒子效果，浅色模式使用更柔和的动态渐变。"
             },
             {
                 "key": "CustomMobileBackgroundImage",

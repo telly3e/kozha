@@ -388,7 +388,7 @@ export const updateThemeSetting = async (key: string, value: unknown): Promise<v
   const win = window as unknown as Record<string, unknown>
   const current = (win.__themeSettings as Record<string, unknown>) || {}
   const updated = { ...current, [key]: value }
-  const res = await fetch(`/api/admin/theme/settings?theme=nezha-BITJEBE`, {
+  const res = await fetch(`/api/admin/theme/settings?theme=kozha`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",

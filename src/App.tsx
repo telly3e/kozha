@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Route, BrowserRouter as Router, Routes } from "react-router-dom"
 
+import AuroraBackground, { isAnimatedAuroraBackgroundEnabled } from "./components/AuroraBackground"
 import { DashCommand } from "./components/DashCommand"
 import ErrorBoundary from "./components/ErrorBoundary"
 import Footer from "./components/Footer"
@@ -33,6 +34,8 @@ const MainApp: React.FC = () => {
   const { setTheme } = useTheme()
   const [isCustomCodeInjected, setIsCustomCodeInjected] = useState(false)
   const { backgroundImage: customBackgroundImage } = useBackground()
+  const themeSettingsReady = Boolean(settingData) && (!settingData?.data?.config?.custom_code || isCustomCodeInjected)
+  const showAnimatedAuroraBackground = themeSettingsReady && isAnimatedAuroraBackgroundEnabled() && !customBackgroundImage
 
   useEffect(() => {
     if (settingData?.data?.config?.custom_code) {
@@ -52,26 +55,18 @@ const MainApp: React.FC = () => {
     }
   }, [forceTheme])
 
-  if (error) {
-    return <ErrorPage code={500} message={error.message} />
-  }
+  useEffect(() => {
+    document.body.classList.toggle("komari-aurora-active", showAnimatedAuroraBackground)
 
-  if (!settingData) {
-    return null
-  }
-
-  if (settingData?.data?.config?.custom_code && !isCustomCodeInjected) {
-    return null
-  }
-
-  if (settingData?.data?.config?.language && !localStorage.getItem("language")) {
-    i18n.changeLanguage(settingData?.data?.config?.language)
-  }
+    return () => {
+      document.body.classList.remove("komari-aurora-active")
+    }
+  }, [showAnimatedAuroraBackground])
 
   const customMobileBackgroundImage = window.CustomMobileBackgroundImage !== "" ? window.CustomMobileBackgroundImage : undefined
-
-  return (
-    <ErrorBoundary>
+  const backgroundLayers = (
+    <>
+      {showAnimatedAuroraBackground && <AuroraBackground />}
       {/* 固定定位的背景层 */}
       {customBackgroundImage && (
         <div
@@ -87,9 +82,36 @@ const MainApp: React.FC = () => {
           style={{ backgroundImage: `url(${customMobileBackgroundImage})` }}
         />
       )}
+    </>
+  )
+
+  if (error) {
+    return (
+      <ErrorBoundary>
+        {backgroundLayers}
+        <ErrorPage code={500} message={error.message} />
+      </ErrorBoundary>
+    )
+  }
+
+  if (!settingData) {
+    return <ErrorBoundary>{backgroundLayers}</ErrorBoundary>
+  }
+
+  if (settingData?.data?.config?.custom_code && !isCustomCodeInjected) {
+    return <ErrorBoundary>{backgroundLayers}</ErrorBoundary>
+  }
+
+  if (settingData?.data?.config?.language && !localStorage.getItem("language")) {
+    i18n.changeLanguage(settingData?.data?.config?.language)
+  }
+
+  return (
+    <ErrorBoundary>
+      {backgroundLayers}
       <div
         className={cn("flex min-h-screen w-full flex-col", {
-          "bg-background": !customBackgroundImage,
+          "bg-background": !customBackgroundImage && !showAnimatedAuroraBackground,
         })}
       >
         <main className="flex z-20 min-h-[calc(100vh-calc(var(--spacing)*16))] flex-1 flex-col gap-4 p-4 md:p-10 md:pt-8">

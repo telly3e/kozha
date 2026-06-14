@@ -4,6 +4,7 @@ declare global {
   interface Window {
     CustomBackgroundImage: string
     CustomMobileBackgroundImage: string
+    EnableAnimatedAuroraBackground: boolean
     ForceShowServices: boolean
     ForceCardInline: boolean
     ForceShowMap: boolean

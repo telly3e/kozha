@@ -70,8 +70,8 @@ jobs:
           cp komari-theme.json theme-package/
           cp -r dist/ theme-package/
 
-          # Create zip file with fixed prefix and release tag, e.g., nezha-dash-theme-v1.0.0.zip
-          ZIP_NAME="nezha-dash-theme-${RELEASE_VERSION}.zip"
+          # Create zip file with fixed prefix and release tag, e.g., kozha-theme-v1.0.0.zip
+          ZIP_NAME="kozha-theme-${RELEASE_VERSION}.zip"
 
           cd theme-package
           zip -r ../${ZIP_NAME} .

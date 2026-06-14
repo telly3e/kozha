@@ -6,15 +6,20 @@ export default function GroupSwitch({
   tabs,
   currentTab,
   setCurrentTab,
+  storageKey = "selectedGroup",
+  layoutId = "tab-switch",
 }: {
   tabs: string[]
   currentTab: string
   setCurrentTab: (tab: string) => void
+  storageKey?: string
+  layoutId?: string
 }) {
   const customBackgroundImage = (window.CustomBackgroundImage as string) !== "" ? window.CustomBackgroundImage : undefined
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const tagRefs = useRef(tabs.map(() => createRef<HTMLDivElement>()))
+  tagRefs.current = tabs.map((_, index) => tagRefs.current[index] || createRef<HTMLDivElement>())
 
   useEffect(() => {
     const container = scrollRef.current
@@ -36,23 +41,26 @@ export default function GroupSwitch({
   }, [])
 
   useEffect(() => {
-    const savedGroup = sessionStorage.getItem("selectedGroup")
-    if (savedGroup && tabs.includes(savedGroup)) {
-      setCurrentTab(savedGroup)
+    const savedTab = sessionStorage.getItem(storageKey)
+    if (savedTab && tabs.includes(savedTab)) {
+      setCurrentTab(savedTab)
     }
-  }, [tabs, setCurrentTab])
+  }, [storageKey, tabs, setCurrentTab])
 
   useEffect(() => {
     const currentTagRef = tagRefs.current[tabs.indexOf(currentTab)]
+    const container = scrollRef.current
 
-    if (currentTagRef && currentTagRef.current) {
-      currentTagRef.current.scrollIntoView({
+    if (container && currentTagRef?.current) {
+      const currentTag = currentTagRef.current
+      const centeredLeft = currentTag.offsetLeft - container.clientWidth / 2 + currentTag.clientWidth / 2
+
+      container.scrollTo({
+        left: Math.max(0, centeredLeft),
         behavior: "smooth",
-        block: "nearest",
-        inline: "center",
       })
     }
-  }, [currentTab])
+  }, [currentTab, tabs])
 
   return (
     <div ref={scrollRef} className="scrollbar-hidden z-50 flex flex-col items-start overflow-x-scroll rounded-[50px]">
@@ -73,7 +81,7 @@ export default function GroupSwitch({
           >
             {currentTab === tab && (
               <m.div
-                layoutId="tab-switch"
+                layoutId={layoutId}
                 className="absolute inset-0 z-10 h-full w-full content-center bg-white shadow-lg shadow-black/5 dark:bg-stone-700 dark:shadow-white/5"
                 style={{
                   originY: "0px",

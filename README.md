@@ -1,64 +1,82 @@
-# nezha-BITJEBE
+# kozha
 
-基于 [nezha-dash-v1](https://github.com/Akizon77/nezha-dash-v1) 二次开发的 [Komari Monitor](https://github.com/komari-monitor/komari) 自定义主题。
+面向 [Komari Monitor](https://github.com/komari-monitor/komari) 的自定义主题，仓库地址为 [telly3e/kozha](https://github.com/telly3e/kozha)。
 
 ## 功能特性
 
+### 首页与视觉
+
+- 内置动态极光背景，可在主题配置中开关
+- 暗色模式使用更深、更柔和的动态粒子背景
+- 浅色模式使用更鲜明的动态渐变背景
+- 支持自定义桌面端/移动端背景图片
+- 支持自定义 Logo、插图、主题模式和导航链接
+
+### 分组与地区筛选
+
+- 首页支持服务器分组筛选
+- 移动端分组自动切换为下拉栏，避免控件拥挤
+- 支持按服务器地区筛选，并显示地区旗帜
+- 中文界面显示中文地区名，其余语言显示英文地区名
+- 可在主题配置中选择使用 Emoji 旗帜或 SVG 旗帜
+
 ### 流量进度条
-- 服务器卡片内置流量使用进度条（无需外部脚本）
-- 支持所有流量计算模式：`sum`（双向）、`max`、`min`、`up`、`down`
-- 基于使用百分比的 HSL 渐变色（绿 -> 黄 -> 红）
-- 轮播显示：使用百分比、重置倒计时、计费类型
-- 通过服务器 ID 精确匹配（避免重名导致的匹配问题）
 
-### 增强标签系统
-- 支持以 `;` 分隔多个标签（匹配 Komari 后端格式）
-- 颜色标签：在标签后追加 `<颜色>` 指定颜色，例如 `So-net<red>;CDN<blue>`
-- 支持所有 [Radix UI 颜色](https://www.radix-ui.com/themes/docs/theme/color)：Gray、Gold、Red、Blue、Green、Purple、Teal、Sky 等
-- 自动分配颜色：未指定颜色的标签会根据文本哈希自动分配视觉上区分度高的颜色
+- 服务器卡片内置流量使用进度条，无需外部脚本
+- 支持所有流量计算模式：`sum`、`max`、`min`、`up`、`down`
+- 支持按使用百分比显示 HSL 渐变色
+- 轮播显示使用百分比、重置倒计时和计费类型
+- 使用服务器 ID 精确匹配，避免重名导致的匹配问题
 
-### 服务监控
-- 30 天服务可用性监控，按日统计在线/离线/延迟
+### 账单与资产
+
+- 支持默认账单货币设置
+- 支持通过服务器 tags 元标签或 JSON 配置覆盖单台服务器货币
+- 支持人民币符号显示风格切换
+- 可选显示资产统计浮窗
+
+### 服务监控与地图
+
+- 可在主题配置中开关首页服务监控按钮和面板
+- 支持 30 天服务可用性监控，按日统计在线/离线/延迟
 - 数据来源于 Komari 的 `common:getRecords` ping 任务
-- 平均延迟计算自动排除无数据的天数
+- 可在主题配置中开关全球地图
 
-### 其他改进
-- 服务器详情页移除了 GPU 部分（Komari 后端不支持 GPU 数据）
-- 页头站点描述从 Komari 后端设置中获取
-- 干净的代码库，无外部脚本依赖
+### 标签系统
+
+- 支持以 `;` 分隔多个标签，匹配 Komari 后端格式
+- 支持颜色标签，例如 `So-net<red>;CDN<blue>`
+- 支持 Radix UI 颜色名：Gray、Gold、Red、Blue、Green、Purple、Teal、Sky 等
+- 未指定颜色的标签会根据文本哈希自动分配颜色
 
 ## 安装方法
 
-### 方法一：通过 Komari 管理面板上传
-1. 从 [Releases](https://github.com/BITJEBE/nezha-BITJEBE/releases) 下载最新的 zip 文件
-2. 进入 Komari 管理面板 -> 主题管理
-3. 点击上传并选择 zip 文件
+### 通过 Komari 管理面板上传
 
-### 方法二：从源码构建
+1. 从 [Releases](https://github.com/telly3e/kozha/releases) 下载最新的主题 zip 文件
+2. 进入 Komari 管理面板 -> 主题管理
+3. 上传 zip 文件并启用主题
+
+### 从源码构建
+
 ```bash
-git clone https://github.com/BITJEBE/nezha-BITJEBE.git
-cd nezha-BITJEBE
+git clone https://github.com/telly3e/kozha.git
+cd kozha
 npm install
 npm run build
 ```
-构建产物位于 `dist/` 目录。将 `dist/` 与 `komari-theme.json` 一起打包为 zip 文件，上传至 Komari 即可。
 
-## 配置说明
+构建完成后，将 `dist/`、`komari-theme.json`、`preview.png` 打包为 zip 文件，并上传到 Komari 主题管理。
 
-### 流量限制
-在 Komari 后端按服务器设置：
-- `traffic_limit`：流量上限（字节）
-- `traffic_limit_type`：`sum` | `max` | `min` | `up` | `down`
-- `expired_at`：到期日期（用于计算流量重置倒计时）
+## 开发
 
-### 标签
-在 Komari 后端的标签字段中按服务器设置：
+```bash
+npm install
+npm run dev
+npm run build
 ```
-So-net<red>;1Gbps<green>;CN2 GIA<blue>
-```
-- 多个标签以 `;` 分隔
-- 追加 `<颜色>` 指定颜色
-- 未指定颜色的标签自动分配颜色
+
+主要配置位于 `komari-theme.json`。主题设置会通过 Komari 管理面板写入，前端通过全局主题配置读取。
 
 ## 技术栈
 
@@ -68,17 +86,7 @@ So-net<red>;1Gbps<green>;CN2 GIA<blue>
 - TanStack React Query
 - Recharts
 - Framer Motion
-- i18next（中文 / 英文）
-
-## 致谢
-
-- 原始主题：[nezha-dash-v1](https://github.com/Akizon77/nezha-dash-v1)，作者 [Akizon77](https://github.com/Akizon77)
-- 监控后端：[Komari Monitor](https://github.com/komari-monitor/komari)
-
-## 贡献者
-
-- [BITJEBE](https://github.com/BITJEBE) - 项目所有者
-- [Claude](https://claude.ai) - AI 辅助开发
+- i18next
 
 ## 许可证
 

@@ -121,6 +121,251 @@
   @apply bg-stone-300 dark:bg-stone-800;
 }
 
+.komari-aurora-background {
+  --aurora-c1: #c8478c;
+  --aurora-c2: #7560d7;
+  --aurora-c3: #159b7d;
+  --aurora-c4: #b77918;
+  --aurora-c5: #2d6fc7;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  min-height: 100lvh;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 35%, rgb(255 255 255 / 0.035), transparent 32%),
+    #050509;
+}
+
+.light .komari-aurora-background {
+  --aurora-c1: #ff72c8;
+  --aurora-c2: #9572ff;
+  --aurora-c3: #35d6af;
+  --aurora-c4: #ffc247;
+  --aurora-c5: #55b7ff;
+  background:
+    radial-gradient(circle at 50% 30%, rgb(255 255 255 / 0.68), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #f0f3ff 44%, #fff4e6 100%);
+}
+
+.komari-aurora-blobs {
+  position: absolute;
+  inset: -60%;
+  width: 220%;
+  height: 220%;
+  filter: saturate(100%) brightness(82%);
+}
+
+.light .komari-aurora-blobs {
+  filter: saturate(148%) brightness(108%);
+}
+
+.komari-aurora-blob {
+  position: absolute;
+  display: block;
+  border-radius: 9999px;
+  opacity: 0.5;
+  filter: blur(118px);
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+
+.light .komari-aurora-blob {
+  opacity: 0.52;
+  filter: blur(78px);
+  mix-blend-mode: multiply;
+}
+
+.komari-aurora-blob-1 {
+  top: 10%;
+  left: 5%;
+  width: 65vw;
+  height: 65vw;
+  background: var(--aurora-c1);
+  animation: komari-aurora-float-1 18s ease-in-out infinite;
+}
+
+.komari-aurora-blob-2 {
+  top: 30%;
+  left: 40%;
+  width: 55vw;
+  height: 55vw;
+  background: var(--aurora-c2);
+  animation: komari-aurora-float-2 22s ease-in-out infinite;
+}
+
+.komari-aurora-blob-3 {
+  top: 55%;
+  left: 15%;
+  width: 50vw;
+  height: 50vw;
+  background: var(--aurora-c3);
+  animation: komari-aurora-float-3 26s ease-in-out infinite;
+}
+
+.komari-aurora-blob-4 {
+  top: 5%;
+  left: 60%;
+  width: 45vw;
+  height: 45vw;
+  background: var(--aurora-c4);
+  opacity: 0.34;
+  animation: komari-aurora-float-4 20s ease-in-out infinite;
+}
+
+.light .komari-aurora-blob-4 {
+  opacity: 0.44;
+}
+
+.komari-aurora-blob-5 {
+  top: 65%;
+  left: 55%;
+  width: 40vw;
+  height: 40vw;
+  background: var(--aurora-c5);
+  animation: komari-aurora-float-5 24s ease-in-out infinite;
+}
+
+.komari-aurora-grain {
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: 2;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  opacity: 0.055;
+  animation: komari-aurora-grain-shift 0.08s steps(1) infinite;
+}
+
+.light .komari-aurora-grain {
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+}
+
+.komari-aurora-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background:
+    radial-gradient(ellipse at center, transparent 24%, rgb(0 0 0 / 0.74) 100%),
+    linear-gradient(180deg, rgb(0 0 0 / 0.36), transparent 42%, rgb(0 0 0 / 0.42));
+}
+
+body.komari-aurora-active #root,
+body.komari-aurora-active #root > div {
+  background-color: transparent !important;
+}
+
+.light .komari-aurora-vignette {
+  background:
+    radial-gradient(ellipse at center, transparent 42%, rgb(255 255 255 / 0.18) 100%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 35%, rgb(255 255 255 / 0.08));
+}
+
+@keyframes komari-aurora-float-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(6%, -8%) scale(1.08);
+  }
+  66% {
+    transform: translate(-5%, 5%) scale(0.94);
+  }
+}
+
+@keyframes komari-aurora-float-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-8%, 6%) scale(0.92);
+  }
+  66% {
+    transform: translate(7%, -5%) scale(1.1);
+  }
+}
+
+@keyframes komari-aurora-float-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(10%, 5%) scale(1.06);
+  }
+  66% {
+    transform: translate(-4%, -9%) scale(0.96);
+  }
+}
+
+@keyframes komari-aurora-float-4 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-9%, 7%) scale(1.12);
+  }
+}
+
+@keyframes komari-aurora-float-5 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  40% {
+    transform: translate(8%, -6%) scale(0.9);
+  }
+  80% {
+    transform: translate(-6%, 8%) scale(1.05);
+  }
+}
+
+@keyframes komari-aurora-grain-shift {
+  0% {
+    transform: translate(0, 0);
+  }
+  10% {
+    transform: translate(-5%, 2%);
+  }
+  20% {
+    transform: translate(3%, -4%);
+  }
+  30% {
+    transform: translate(-2%, 6%);
+  }
+  40% {
+    transform: translate(5%, -1%);
+  }
+  50% {
+    transform: translate(-4%, 3%);
+  }
+  60% {
+    transform: translate(2%, -6%);
+  }
+  70% {
+    transform: translate(-6%, 1%);
+  }
+  80% {
+    transform: translate(4%, 4%);
+  }
+  90% {
+    transform: translate(-1%, -5%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .komari-aurora-blob,
+  .komari-aurora-grain {
+    animation: none;
+  }
+}
+
 .hamster-loading-wrapper {
   --size: 12px;
   height: var(--size);
