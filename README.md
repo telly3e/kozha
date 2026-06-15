@@ -96,6 +96,11 @@ npm run build
 - Framer Motion
 - i18next
 
-## 许可证
+## Credits
+本项目参考了以下开源项目，特别感谢他们的分享！
+https://github.com/Akizon77/nezha-dash-v1
+https://github.com/BITJEBE/nezha-BITJEBE
+https://codepen.io/Jiironimo/pen/PwGOdoL
 
-MIT
+## 许可证
+Apache-2.0
