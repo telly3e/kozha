@@ -22,10 +22,10 @@
             },
             {
                 "key": "EnableAnimatedAuroraBackground",
-                "name": "动态极光背景",
+                "name": "极光背景",
                 "type": "switch",
                 "default": true,
-                "help": "开启后在未设置背景图片时显示内置动态极光背景，暗色模式使用霓虹粒子效果，浅色模式使用更柔和的动态渐变。"
+                "help": "开启后在未设置背景图片时显示内置极光背景，暗色模式使用霓虹粒子效果，浅色模式使用更柔和的渐变。"
             },
             {
                 "key": "CustomMobileBackgroundImage",

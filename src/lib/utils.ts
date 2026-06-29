@@ -443,10 +443,11 @@ function readTagCurrency(server: any): string {
 
 export function parsePublicNote(publicNote: string): PublicNoteData | null {
   try {
-    if (!publicNote) {
+    const note = publicNote?.trim()
+    if (!note || !note.startsWith("{")) {
       return null
     }
-    const data = JSON.parse(publicNote)
+    const data = JSON.parse(note)
     if (!data.billingDataMod && !data.planDataMod) {
       return null
     }
@@ -495,8 +496,7 @@ export function parsePublicNote(publicNote: string): PublicNoteData | null {
         extra: data.planDataMod.extra || "",
       },
     }
-  } catch (error) {
-    console.error("Error parsing public note:", error)
+  } catch {
     return null
   }
 }

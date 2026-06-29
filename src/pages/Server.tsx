@@ -283,8 +283,8 @@ export default function Servers() {
       />
       {showVisitorCapsule && <VisitorCapsuleBar />}
       {showAssetCard && <AssetSummaryWidget now={nezhaWsData.now} servers={regionFilteredServers} />}
-      <div className="flex mt-6 items-center justify-between gap-2 server-overview-controls">
-        <section className="scrollbar-hidden flex w-full min-w-0 items-center gap-2 overflow-x-auto sm:overflow-hidden">
+      <div className="flex mt-6 flex-wrap items-center gap-2 server-overview-controls">
+        <section className="contents">
           <button
             onClick={() => {
               setShowMap(showMap === "0" ? "1" : "0")
@@ -354,19 +354,19 @@ export default function Servers() {
             />
           </button>
           {groupTabs.length > 1 && (
-            <div className="scrollbar-hidden z-50 flex flex-col items-start overflow-x-scroll rounded-[50px] sm:hidden">
+            <div className="z-50 flex flex-col items-start rounded-[50px] sm:hidden">
               <div
                 className={cn("flex items-center gap-1 rounded-[50px] bg-stone-100 p-[3px] dark:bg-stone-800", {
                   "bg-stone-100/70 dark:bg-stone-800/70": customBackgroundImage,
                 })}
               >
                 <Select value={currentGroup} onValueChange={handleTagChange}>
-                  <SelectTrigger className="relative h-[35px] w-[96px] shrink-0 justify-center gap-1.5 rounded-3xl border-0 bg-white px-2.5 py-0 pr-7 text-[13px] font-[600] leading-[1.25] text-black ring-0 ring-offset-0 transition-all duration-500 focus:ring-0 focus:ring-offset-0 dark:bg-stone-700 dark:text-white [&>span]:!flex [&>span]:min-w-0 [&>span]:flex-1 [&>span]:items-center [&>span]:justify-center [&>span]:overflow-hidden [&>span]:whitespace-nowrap [&>svg]:absolute [&>svg]:right-2.5 [&>svg]:ml-0 [&>svg]:size-3 [&>svg]:shrink-0">
+                  <SelectTrigger className="relative h-[35px] w-auto min-w-[62px] max-w-[min(22rem,calc(100vw-2rem))] shrink-0 justify-center gap-1.5 rounded-3xl border-0 bg-white px-2.5 py-0 pr-7 text-[13px] font-[600] leading-[1.25] text-black ring-0 ring-offset-0 transition-colors focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-stone-700 dark:text-white [&>span]:!flex [&>span]:min-w-0 [&>span]:items-center [&>span]:justify-center [&>span]:overflow-hidden [&>span]:whitespace-nowrap [&>svg]:absolute [&>svg]:right-2.5 [&>svg]:ml-0 [&>svg]:size-3 [&>svg]:shrink-0">
                     <span>
                       <span className="min-w-0 truncate whitespace-nowrap text-center tracking-wide leading-[1.25]">{currentGroup}</span>
                     </span>
                   </SelectTrigger>
-                  <SelectContent className="max-h-[320px] w-[160px] overflow-y-auto rounded-lg">
+                  <SelectContent className="max-h-[320px] w-max min-w-[62px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg">
                     {groupTabs.map((group) => (
                       <SelectItem key={group} value={group} className="text-xs [&>span:last-child]:block [&>span:last-child]:w-full">
                         <span className="grid w-full grid-cols-[minmax(0,1fr)] items-center">
@@ -383,14 +383,14 @@ export default function Servers() {
             <GroupSwitch tabs={groupTabs} currentTab={currentGroup} setCurrentTab={handleTagChange} />
           </div>
           {regionOptions.length > 1 && (
-            <div className="scrollbar-hidden z-50 flex flex-col items-start overflow-x-scroll rounded-[50px]">
+            <div className="z-50 flex flex-col items-start rounded-[50px]">
               <div
                 className={cn("flex items-center gap-1 rounded-[50px] bg-stone-100 p-[3px] dark:bg-stone-800", {
                   "bg-stone-100/70 dark:bg-stone-800/70": customBackgroundImage,
                 })}
               >
                 <Select value={activeRegion} open={regionOpen} onOpenChange={setRegionOpen} onValueChange={handleRegionChange}>
-                  <SelectTrigger className="relative h-[35px] w-[100px] shrink-0 justify-center gap-1.5 rounded-3xl border-0 bg-white px-2.5 py-0 pr-7 text-[13px] font-[600] leading-[1.25] text-black ring-0 ring-offset-0 transition-all duration-500 focus:ring-0 focus:ring-offset-0 sm:w-[108px] dark:bg-stone-700 dark:text-white [&>span]:!flex [&>span]:min-w-0 [&>span]:flex-1 [&>span]:items-center [&>span]:justify-center [&>span]:gap-1.5 [&>span]:overflow-hidden [&>span]:whitespace-nowrap [&>svg]:absolute [&>svg]:right-2.5 [&>svg]:ml-0 [&>svg]:size-3 [&>svg]:shrink-0">
+                  <SelectTrigger className="relative h-[35px] w-auto min-w-[100px] max-w-[min(22rem,calc(100vw-2rem))] shrink-0 justify-center gap-1.5 rounded-3xl border-0 bg-white px-2.5 py-0 pr-7 text-[13px] font-[600] leading-[1.25] text-black shadow-none ring-0 ring-offset-0 transition-colors focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-stone-700 dark:text-white [&>span]:!flex [&>span]:min-w-0 [&>span]:items-center [&>span]:justify-center [&>span]:gap-1.5 [&>span]:overflow-hidden [&>span]:whitespace-nowrap [&>svg]:absolute [&>svg]:right-2.5 [&>svg]:ml-0 [&>svg]:size-3 [&>svg]:shrink-0">
                     <span>
                       <MapPinIcon className="size-[13px] shrink-0 text-stone-300 dark:text-stone-300" />
                       {canShowRegionFlag(activeRegion) && (
@@ -401,7 +401,7 @@ export default function Servers() {
                       <span className="min-w-0 truncate whitespace-nowrap text-center tracking-wide leading-[1.25]">{getRegionCodeLabel(selectedRegion)}</span>
                     </span>
                   </SelectTrigger>
-                  <SelectContent className="max-h-[320px] w-[188px] overflow-y-auto rounded-lg">
+                  <SelectContent className="max-h-[320px] w-max min-w-[100px] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg">
                     {regionOptions.map((region) => (
                       <SelectItem key={region.code} value={region.code} className="text-xs [&>span:last-child]:block [&>span:last-child]:w-full">
                         {region.code === ALL_REGIONS ? (

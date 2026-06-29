@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils"
-import { m } from "framer-motion"
 import { createRef, useEffect, useRef } from "react"
 
 export default function GroupSwitch({
@@ -7,13 +6,11 @@ export default function GroupSwitch({
   currentTab,
   setCurrentTab,
   storageKey = "selectedGroup",
-  layoutId = "tab-switch",
 }: {
   tabs: string[]
   currentTab: string
   setCurrentTab: (tab: string) => void
   storageKey?: string
-  layoutId?: string
 }) {
   const customBackgroundImage = (window.CustomBackgroundImage as string) !== "" ? window.CustomBackgroundImage : undefined
 
@@ -63,9 +60,9 @@ export default function GroupSwitch({
   }, [currentTab, tabs])
 
   return (
-    <div ref={scrollRef} className="scrollbar-hidden z-50 flex flex-col items-start overflow-x-scroll rounded-[50px]">
+    <div ref={scrollRef} className="z-50 flex flex-col items-start rounded-[50px]">
       <div
-        className={cn("flex items-center gap-1 rounded-[50px] bg-stone-100 p-[3px] dark:bg-stone-800", {
+        className={cn("flex flex-wrap items-center gap-1 rounded-[50px] bg-stone-100 p-[3px] dark:bg-stone-800", {
           "bg-stone-100/70 dark:bg-stone-800/70": customBackgroundImage,
         })}
       >
@@ -79,16 +76,7 @@ export default function GroupSwitch({
               currentTab === tab ? "text-black dark:text-white" : "text-stone-400 dark:text-stone-500",
             )}
           >
-            {currentTab === tab && (
-              <m.div
-                layoutId={layoutId}
-                className="absolute inset-0 z-10 h-full w-full content-center bg-white shadow-lg shadow-black/5 dark:bg-stone-700 dark:shadow-white/5"
-                style={{
-                  originY: "0px",
-                  borderRadius: 46,
-                }}
-              />
-            )}
+            {currentTab === tab && <div className="absolute inset-0 z-10 h-full w-full content-center rounded-[46px] bg-white shadow-lg shadow-black/5 dark:bg-stone-700 dark:shadow-white/5" />}
             <div className="relative z-20 flex items-center gap-1">
               <p className="whitespace-nowrap">{tab}</p>
             </div>
