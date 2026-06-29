@@ -162,7 +162,7 @@ export const fetchMonitor = async (server_id: number, hours: number = 24): Promi
     const timestamps = zip.map((z) => z.t)
 
     // 前端降采样：保留所有丢包点及邻近点，均匀抽稀正常点
-    const targetPoints = hours <= 24 ? 2000 : hours <= 168 ? 3000 : 4000
+    const targetPoints = 500
     if (timestamps.length > targetPoints) {
       const keepSet = new Set<number>()
       keepSet.add(0)
@@ -190,7 +190,16 @@ export const fetchMonitor = async (server_id: number, hours: number = 24): Promi
         }
       }
 
-      const kept = Array.from(keepSet).sort((a, b) => a - b)
+      let kept = Array.from(keepSet).sort((a, b) => a - b)
+      if (kept.length > targetPoints) {
+        const reduced = new Set<number>()
+        const step = (kept.length - 1) / (targetPoints - 1)
+        for (let i = 0; i < targetPoints; i++) {
+          reduced.add(kept[Math.round(i * step)])
+        }
+        kept = Array.from(reduced).sort((a, b) => a - b)
+      }
+
       return {
         ...s,
         created_at: kept.map((i) => timestamps[i]),

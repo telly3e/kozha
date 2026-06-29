@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { fetchMonitor } from "@/lib/nezha-api"
 import { cn, formatTime } from "@/lib/utils"
-import { NezhaMonitor, ServerMonitorChart } from "@/types/nezha-api"
+import { MonitorResponse, NezhaMonitor, ServerMonitorChart } from "@/types/nezha-api"
 import { useQuery } from "@tanstack/react-query"
 import * as React from "react"
 import { useCallback, useMemo } from "react"
@@ -18,7 +18,7 @@ import { Switch } from "./ui/switch"
 
 interface ResultItem {
   created_at: number
-  [key: string]: number
+  [key: string]: number | null
 }
 
 /**
@@ -85,21 +85,43 @@ const TIME_OPTIONS = [
   { value: "24", label: "24h" },
   { value: "72", label: "3d" },
   { value: "168", label: "7d" },
-  { value: "720", label: "30d" },
 ]
 
-export function NetworkChart({ server_id, show }: { server_id: number; show: boolean }) {
+export function NetworkChart({
+  server_id,
+  show,
+  onAvailabilityChange,
+}: {
+  server_id: number
+  show: boolean
+  onAvailabilityChange?: (hasData: boolean) => void
+}) {
   const { t } = useTranslation()
   const [hours, setHours] = React.useState(24)
+  const queryHours = hours <= 24 ? 24 : hours
 
-  const { data: monitorData } = useQuery({
-    queryKey: ["monitor", server_id, hours],
-    queryFn: () => fetchMonitor(server_id, hours),
+  const { data: fetchedMonitorData } = useQuery({
+    queryKey: ["monitor", server_id, queryHours],
+    queryFn: () => fetchMonitor(server_id, queryHours),
     enabled: show,
+    staleTime: 60000,
     refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    refetchInterval: 10000,
+    refetchOnWindowFocus: false,
+    refetchInterval: 60000,
   })
+
+  React.useEffect(() => {
+    setHours(24)
+  }, [server_id])
+
+  const monitorData = useMemo(() => (fetchedMonitorData ? filterMonitorData(fetchedMonitorData, hours) : null), [fetchedMonitorData, hours])
+  const hasMonitorData = fetchedMonitorData?.success ? Boolean(fetchedMonitorData.data?.length) : undefined
+
+  React.useEffect(() => {
+    if (hasMonitorData !== undefined) {
+      onAvailabilityChange?.(hasMonitorData)
+    }
+  }, [hasMonitorData, onAvailabilityChange])
 
   if (!monitorData) return <NetworkChartLoading />
 
@@ -576,6 +598,36 @@ const transformData = (data: NezhaMonitor[]) => {
   return monitorData
 }
 
+const filterMonitorData = (monitorData: MonitorResponse, hours: number): MonitorResponse => {
+  const cutoff = Date.now() - hours * 60 * 60 * 1000
+
+  return {
+    ...monitorData,
+    data: monitorData.data
+      .map((item) => {
+        const created_at: number[] = []
+        const avg_delay: number[] = []
+        const packet_loss: number[] | undefined = item.packet_loss ? [] : undefined
+
+        item.created_at.forEach((time, index) => {
+          if (time < cutoff) return
+
+          created_at.push(time)
+          avg_delay.push(item.avg_delay[index])
+          packet_loss?.push(item.packet_loss?.[index] ?? 0)
+        })
+
+        return {
+          ...item,
+          created_at,
+          avg_delay,
+          packet_loss,
+        }
+      })
+      .filter((item) => item.created_at.length > 0),
+  }
+}
+
 const formatData = (rawData: NezhaMonitor[]) => {
   const result: { [time: number]: ResultItem } = {}
 
@@ -591,19 +643,25 @@ const formatData = (rawData: NezhaMonitor[]) => {
 
     // Calculate packet loss if not provided
     const packetLoss = item.packet_loss || calculatePacketLoss(avg_delay)
+    const valuesByTime = new Map<number, { delay: number; packetLoss: number | null }>()
+
+    created_at.forEach((time, index) => {
+      valuesByTime.set(time, {
+        delay: avg_delay[index],
+        packetLoss: packetLoss[index] ?? null,
+      })
+    })
 
     allTimeArray.forEach((time) => {
       if (!result[time]) {
         result[time] = { created_at: time }
       }
 
-      const timeIndex = created_at.indexOf(time)
-      // @ts-expect-error - avg_delay is an array
-      result[time][monitor_name] = timeIndex !== -1 ? avg_delay[timeIndex] : null
+      const value = valuesByTime.get(time)
+      result[time][monitor_name] = value?.delay ?? null
       // Add packet loss data if available
       if (packetLoss) {
-        // @ts-expect-error - packet_loss is calculated
-        result[time][`${monitor_name}_packet_loss`] = timeIndex !== -1 ? packetLoss[timeIndex] : null
+        result[time][`${monitor_name}_packet_loss`] = value?.packetLoss ?? null
       }
     })
   })
