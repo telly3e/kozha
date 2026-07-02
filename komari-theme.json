@@ -16,7 +16,7 @@
             {
                 "key": "CustomBackgroundImage",
                 "name": "背景图片",
-                "type": "input",
+                "type": "string",
                 "default": "",
                 "help": "桌面端背景图片URL，留空则不显示背景图。支持图片直链或随机图API。"
             },
@@ -30,21 +30,21 @@
             {
                 "key": "CustomMobileBackgroundImage",
                 "name": "移动端背景图片",
-                "type": "input",
+                "type": "string",
                 "default": "",
                 "help": "移动端单独的背景图片URL，留空则跟随桌面端设置。"
             },
             {
                 "key": "CustomLogo",
                 "name": "站点Logo",
-                "type": "input",
+                "type": "string",
                 "default": "/favicon.ico",
                 "help": "站点Logo图片URL，显示在左上角和浏览器标签页。"
             },
             {
                 "key": "CustomIllustration",
                 "name": "自定义插图",
-                "type": "input",
+                "type": "string",
                 "default": "",
                 "help": "首页右侧的自定义插图URL，留空使用默认插图。"
             },
@@ -63,7 +63,7 @@
             {
                 "key": "CustomLinks",
                 "name": "自定义链接",
-                "type": "input",
+                "type": "string",
                 "default": "",
                 "help": "JSON格式的自定义链接数组，显示在顶部导航栏。格式: [{\"link\":\"https://example.com\",\"name\":\"示例\"}]"
             },
@@ -209,7 +209,7 @@
             {
                 "key": "ServerBillingCurrencyOverrides",
                 "name": "服务器货币覆盖",
-                "type": "input",
+                "type": "string",
                 "default": "",
                 "help": "JSON对象，按服务器UUID、卡片ID或名称指定货币，例如 {\"Tokyo\":\"JPY\",\"spartanhost\":\"USD\"}。【更推荐】直接在 Komari 后端服务器的 tags 字段里加 <JPY>/<USD>/<CNY> 等元标签，例如把 KDDI 的 tags 改成 \"Tokyonline; KDDI; <JPY>\"，主题会自动识别且不在前端显示该标签。优先级：本JSON > tags元标签 > 默认账单货币 > 后端currency字段。"
             },

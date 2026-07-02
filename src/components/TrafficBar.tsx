@@ -45,9 +45,7 @@ export default function TrafficBar({ used, limit, expiredAt, limitType }: Traffi
   const showResetDay = win.TrafficBarShowResetDay !== false
   const showBillingMode = win.TrafficBarShowBillingMode !== false
 
-  if (limit <= 0) return null
-
-  const percent = Math.min(100, (used / limit) * 100)
+  const percent = limit > 0 ? Math.min(100, (used / limit) * 100) : 0
   const percentStr = percent.toFixed(2)
   const usedFormatted = formatBytes(used)
   const limitFormatted = formatBytes(limit)
@@ -78,6 +76,8 @@ export default function TrafficBar({ used, limit, expiredAt, limitType }: Traffi
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [shouldCycle, infoItems.length])
+
+  if (limit <= 0) return null
 
   return (
     <div className="space-y-1.5 w-full">

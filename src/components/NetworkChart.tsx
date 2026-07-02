@@ -282,6 +282,7 @@ export const NetworkChartClient = React.memo(function NetworkChart({
           type="linear"
           dot={false}
           dataKey="avg_delay"
+          name={t("monitor.avgDelay", "Avg Delay")}
           stroke={getColorByIndex(chart)}
           yAxisId="delay"
           connectNulls={true}
@@ -297,7 +298,7 @@ export const NetworkChartClient = React.memo(function NetworkChart({
             strokeWidth={1}
             type="linear"
             dot={false}
-            dataKey={chart}
+            dataKey={(item: ResultItem) => item[chart]}
             stroke={getColorByIndex(chart)}
             name={chart}
             connectNulls={true}
@@ -316,8 +317,9 @@ export const NetworkChartClient = React.memo(function NetworkChart({
             strokeWidth={1}
             type="linear"
             dot={false}
-            dataKey={key}
+            dataKey={(item: ResultItem) => item[key]}
             stroke={getColorByIndex(key)}
+            name={key}
             connectNulls={true}
             yAxisId="delay"
             hide={hiddenCharts.has(key)}

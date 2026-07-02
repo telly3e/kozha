@@ -4,8 +4,9 @@
     <script>
       // 在页面渲染前就执行主题初始化
       try {
-        const storageKey = "vite-ui-theme"
-        let theme = localStorage.getItem(storageKey)
+        const storageKey = "appearance"
+        const legacyStorageKey = "vite-ui-theme"
+        let theme = localStorage.getItem(storageKey) || localStorage.getItem(legacyStorageKey)
         if (theme === "system" || !theme) {
           theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
         }
@@ -64,8 +65,9 @@
     </style>
     <script>
       ;(function () {
-        const storageKey = "vite-ui-theme"
-        const theme = localStorage.getItem(storageKey) || "system"
+        const storageKey = "appearance"
+        const legacyStorageKey = "vite-ui-theme"
+        const theme = localStorage.getItem(storageKey) || localStorage.getItem(legacyStorageKey) || "system"
         const root = document.documentElement
 
         function updateThemeColor(isDark) {

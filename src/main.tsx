@@ -21,7 +21,7 @@ const queryClient = new QueryClient()
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <RPC2Provider>
     <MotionProvider>
-      <ThemeProvider storageKey="vite-ui-theme">
+      <ThemeProvider>
         <ThemeColorManager />
         <QueryClientProvider client={queryClient}>
           <WebSocketProvider url="/api/v1/ws/server">

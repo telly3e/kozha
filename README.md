@@ -48,6 +48,7 @@
 - 支持按时间范围查看探针延迟曲线
 - 支持点击顶部探针卡片聚焦单个或多个监控项
 - 支持点击底部图例隐藏或恢复对应曲线
+- 多条探针曲线使用统一时间点降采样，鼠标悬停时可同时查看各曲线数值
 - 支持 Peak cut 削峰，让异常峰值场景下的趋势更易读
 
 ### 标签系统
@@ -74,7 +75,7 @@ npm install
 npm run build
 ```
 
-构建完成后，将 `dist/`、`komari-theme.json`、`preview.png` 打包为 zip 文件，并上传到 Komari 主题管理。
+构建完成后，将 `dist/`、`komari-theme.json`、`preview.png` 打包为 zip 文件，并上传到 Komari 主题管理。发布工作流会自动生成符合 Komari 主题结构的 zip 包。
 
 ## 开发
 
@@ -84,7 +85,7 @@ npm run dev
 npm run build
 ```
 
-主要配置位于 `komari-theme.json`。主题设置会通过 Komari 管理面板写入，前端通过全局主题配置读取。
+主要配置位于 `komari-theme.json`，使用 Komari 官方 managed 配置类型。主题设置会通过 Komari 管理面板写入，前端通过全局主题配置读取；外观模式使用官方推荐的 `appearance` 本地存储键，并兼容旧版 `vite-ui-theme`。
 
 ## 技术栈
 

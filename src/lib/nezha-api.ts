@@ -6,6 +6,108 @@ import { getKomariNodes, uuidToNumber } from "./utils"
 
 //let lastestRefreshTokenAt = 0
 
+const MONITOR_TARGET_POINTS = 500
+
+type MonitorPoint = {
+  time: number
+  delay: number
+  packetLoss: number
+}
+
+const average = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length
+
+const alignAndDownsampleMonitorSeries = (series: NezhaMonitor[], targetPoints = MONITOR_TARGET_POINTS): NezhaMonitor[] => {
+  const pointSeries = series.map((item) => ({
+    item,
+    points: item.created_at
+      .map((time, index) => ({
+        time,
+        delay: item.avg_delay[index] ?? 0,
+        packetLoss: item.packet_loss?.[index] ?? 0,
+      }))
+      .filter((point) => Number.isFinite(point.time) && Number.isFinite(point.delay) && Number.isFinite(point.packetLoss))
+      .sort((a, b) => a.time - b.time),
+  }))
+
+  const nonEmptySeries = pointSeries.filter(({ points }) => points.length > 0)
+  if (nonEmptySeries.length === 0) return series
+
+  const start = Math.min(...nonEmptySeries.map(({ points }) => points[0].time))
+  const end = Math.max(...nonEmptySeries.map(({ points }) => points[points.length - 1].time))
+  const maxSeriesLength = Math.max(...nonEmptySeries.map(({ points }) => points.length))
+  const pointCount = Math.min(targetPoints, Math.max(2, maxSeriesLength))
+
+  if (start === end || pointCount <= 1) {
+    return series.map((item) => ({
+      ...item,
+      created_at: [start],
+      avg_delay: [item.avg_delay[item.avg_delay.length - 1] ?? 0],
+      packet_loss: [item.packet_loss?.[item.packet_loss.length - 1] ?? 0],
+    }))
+  }
+
+  const step = (end - start) / (pointCount - 1)
+  const commonTimes = Array.from({ length: pointCount }, (_, index) => Math.round(start + step * index))
+  commonTimes[0] = start
+  commonTimes[commonTimes.length - 1] = end
+
+  return pointSeries.map(({ item, points }) => {
+    if (points.length === 0) {
+      return {
+        ...item,
+        created_at: commonTimes,
+        avg_delay: commonTimes.map(() => 0),
+        packet_loss: commonTimes.map(() => 0),
+      }
+    }
+
+    let bucketCursor = 0
+    let nearestCursor = 0
+
+    const sampled = commonTimes.map((time, index) => {
+      const lowerBound = index === 0 ? time - step / 2 : (commonTimes[index - 1] + time) / 2
+      const upperBound = index === commonTimes.length - 1 ? time + step / 2 : (time + commonTimes[index + 1]) / 2
+
+      while (bucketCursor < points.length && points[bucketCursor].time < lowerBound) {
+        bucketCursor++
+      }
+
+      const bucket: MonitorPoint[] = []
+      let scanCursor = bucketCursor
+      while (scanCursor < points.length && points[scanCursor].time <= upperBound) {
+        bucket.push(points[scanCursor])
+        scanCursor++
+      }
+
+      if (bucket.length > 0) {
+        return {
+          delay: Number(average(bucket.map((point) => point.delay)).toFixed(2)),
+          packetLoss: Math.max(...bucket.map((point) => point.packetLoss)),
+        }
+      }
+
+      while (
+        nearestCursor + 1 < points.length &&
+        Math.abs(points[nearestCursor + 1].time - time) <= Math.abs(points[nearestCursor].time - time)
+      ) {
+        nearestCursor++
+      }
+
+      return {
+        delay: points[nearestCursor].delay,
+        packetLoss: points[nearestCursor].packetLoss,
+      }
+    })
+
+    return {
+      ...item,
+      created_at: commonTimes,
+      avg_delay: sampled.map((point) => point.delay),
+      packet_loss: sampled.map((point) => point.packetLoss),
+    }
+  })
+}
+
 export const fetchServerGroup = async (): Promise<ServerGroupResponse> => {
   const kmNodes: Record<string, any> = await getKomariNodes()
 
@@ -13,8 +115,8 @@ export const fetchServerGroup = async (): Promise<ServerGroupResponse> => {
     throw new Error(kmNodes.error)
   }
   // extract groups
-  let groups: string[] = []
-  Object.entries(kmNodes).forEach(([_, value]) => {
+  const groups: string[] = []
+  Object.entries(kmNodes).forEach(([, value]) => {
     if (value.group && !groups.includes(value.group)) {
       groups.push(value.group)
     }
@@ -31,8 +133,8 @@ export const fetchServerGroup = async (): Promise<ServerGroupResponse> => {
           name: group,
         },
         servers: Object.entries(kmNodes)
-          .filter(([_, value]) => value.group === group)
-          .map(([key, _]) => uuidToNumber(key)),
+          .filter(([, value]) => value.group === group)
+          .map(([key]) => uuidToNumber(key)),
       })),
     ],
   }
@@ -131,7 +233,7 @@ export const fetchMonitor = async (server_id: number, hours: number = 24): Promi
   }
 
   // 每个序列按时间升序，并计算真实丢包率
-  const data = Array.from(seriesByTask.values()).map((s) => {
+  const fullData = Array.from(seriesByTask.values()).map((s) => {
     const zip = s.created_at.map((t, i) => ({ t, v: s.avg_delay[i] }))
     zip.sort((a, b) => a.t - b.t)
 
@@ -159,62 +261,15 @@ export const fetchMonitor = async (server_id: number, hours: number = 24): Promi
       }
     }
 
-    const timestamps = zip.map((z) => z.t)
-
-    // 前端降采样：保留所有丢包点及邻近点，均匀抽稀正常点
-    const targetPoints = 500
-    if (timestamps.length > targetPoints) {
-      const keepSet = new Set<number>()
-      keepSet.add(0)
-      keepSet.add(timestamps.length - 1)
-
-      // 保留所有丢包点及前后各 3 个邻近点（确保 EMA 曲线完整）
-      for (let i = 0; i < rawVals.length; i++) {
-        if (rawVals[i] === -1) {
-          for (let j = Math.max(0, i - 3); j <= Math.min(timestamps.length - 1, i + 6); j++) {
-            keepSet.add(j)
-          }
-        }
-      }
-
-      // 剩余配额均匀分配给正常点
-      const normalTarget = targetPoints - keepSet.size
-      if (normalTarget > 0) {
-        const normalIndices: number[] = []
-        for (let i = 0; i < timestamps.length; i++) {
-          if (!keepSet.has(i)) normalIndices.push(i)
-        }
-        const step = Math.max(1, Math.floor(normalIndices.length / normalTarget))
-        for (let i = 0; i < normalIndices.length && keepSet.size < targetPoints; i += step) {
-          keepSet.add(normalIndices[i])
-        }
-      }
-
-      let kept = Array.from(keepSet).sort((a, b) => a - b)
-      if (kept.length > targetPoints) {
-        const reduced = new Set<number>()
-        const step = (kept.length - 1) / (targetPoints - 1)
-        for (let i = 0; i < targetPoints; i++) {
-          reduced.add(kept[Math.round(i * step)])
-        }
-        kept = Array.from(reduced).sort((a, b) => a - b)
-      }
-
-      return {
-        ...s,
-        created_at: kept.map((i) => timestamps[i]),
-        avg_delay: kept.map((i) => delays[i]),
-        packet_loss: kept.map((i) => packetLoss[i]),
-      }
-    }
-
     return {
       ...s,
-      created_at: timestamps,
+      created_at: zip.map((z) => z.t),
       avg_delay: delays,
       packet_loss: packetLoss,
     }
   })
+
+  const data = alignAndDownsampleMonitorSeries(fullData)
 
   // 避免空的 avg_delay
   for (const s of data) {
@@ -314,7 +369,7 @@ export const fetchService = async (): Promise<ServiceResponse> => {
   const kmNodes: Record<string, any> = await getKomariNodes()
   const uuids = Object.keys(kmNodes || {})
 
-  let allTasks: any[] = []
+  const allTasks: any[] = []
   let allRecords: any[] = []
   const seenTaskIds = new Set<number>()
 
