@@ -757,10 +757,6 @@ export const komariToNezhaWebsocketResponse = (data: any): NezhaWebsocketRespons
     const uuid = server.uuid
     const status = statusMap.get(uuid)
     const countryCode = server?.region ? countryFlagToCode(String(server.region)) : ""
-    // 已处理的 uuid 从映射中移除，避免后续增补阶段重复添加
-    if (statusMap.has(uuid)) {
-      statusMap.delete(uuid)
-    }
 
     const bootTime = status ? new Date(status.time).getTime() / 1000 - (status.uptime || 0) : 0
 
@@ -835,55 +831,6 @@ export const komariToNezhaWebsocketResponse = (data: any): NezhaWebsocketRespons
       currency: typeof server.currency === "string" ? server.currency : "",
     }
   })
-
-  // 追加那些仅在 data 里出现但缓存里没有的新服务器（保证“出现过的都显示”）
-  for (const [uuid, status] of statusMap.entries()) {
-    const host = {
-      platform: status.os || "",
-      platform_version: status.kernel_version || "",
-      cpu: status.cpu_name ? [status.cpu_name] : [],
-      gpu: status.gpu_name ? [status.gpu_name] : [],
-      mem_total: status.ram_total || 0,
-      disk_total: status.disk_total || 0,
-      swap_total: status.swap_total || 0,
-      arch: status.arch || "",
-      boot_time: new Date(status.time).getTime() / 1000 - (status.uptime || 0),
-      version: "",
-    }
-
-    const state = {
-      cpu: status.cpu || 0,
-      mem_used: status.ram || 0,
-      swap_used: status.swap || 0,
-      disk_used: status.disk || 0,
-      net_in_transfer: status.net_total_down || 0,
-      net_out_transfer: status.net_total_up || 0,
-      net_in_speed: status.net_in || 0,
-      net_out_speed: status.net_out || 0,
-      uptime: status.uptime || 0,
-      load_1: status.load || 0,
-      load_5: status.load5 || 0,
-      load_15: status.load15 || 0,
-      tcp_conn_count: status.connections || 0,
-      udp_conn_count: status.connections_udp || 0,
-      process_count: status.process || 0,
-      temperatures: status.temp > 0 ? [{ Name: "CPU", Temperature: status.temp }] : [],
-      gpu: typeof status.gpu === "number" ? [status.gpu] : [],
-    }
-
-    servers.push({
-      uuid,
-      id: uuidToNumber(uuid),
-      name: status.name || uuid,
-      public_note: "",
-      last_active: status.time || "0000-00-00T00:00:00Z",
-      country_code: status.region ? countryFlagToCode(status.region) : "",
-      display_index: 0,
-      host,
-      state,
-      online: status.online === true,
-    })
-  }
 
   return {
     now: Date.now(),
