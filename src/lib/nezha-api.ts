@@ -108,6 +108,209 @@ const alignAndDownsampleMonitorSeries = (series: NezhaMonitor[], targetPoints = 
   })
 }
 
+type PingTask = {
+  id?: number | string
+  name?: string
+}
+
+type PingRecord = {
+  task_id?: number | string
+  time?: string
+  value?: number | string | null
+}
+
+type PingResult = {
+  tasks?: PingTask[]
+  records?: PingRecord[]
+}
+
+const toTaskId = (value: unknown): number | null => {
+  const id = Number(value)
+  return Number.isFinite(id) ? id : null
+}
+
+const getPingRecords = async (uuid: string, hours: number, httpOnly = false): Promise<PingResult> => {
+  const client = SharedClient()
+  const call = <TResult>(method: string, params: unknown) =>
+    httpOnly ? client.callViaHTTP<any, TResult>(method, params) : client.call<any, TResult>(method, params)
+
+  // 1.2.x 的公开接口会同时返回 tasks，适合主题在未登录/私有站点模式下使用。
+  try {
+    const result = await call<PingResult>("public:getPingRecords", {
+      uuid,
+      hours: String(hours),
+    })
+    if (result && Array.isArray(result.records)) {
+      return result
+    }
+  } catch {
+    // 旧版本没有 public:getPingRecords 时回退到兼容 RPC。
+  }
+
+  return call<PingResult>("common:getRecords", {
+    type: "ping",
+    uuid,
+    maxCount: -1,
+    hours,
+  })
+}
+
+const getPublicPingTasks = async (): Promise<PingTask[]> => {
+  try {
+    const result: any = await SharedClient().call("public:getPublicPingTasks")
+    const tasks: PingTask[] = []
+    for (const task of Array.isArray(result) ? result : []) {
+      const id = toTaskId(task?.id)
+      if (id !== null) tasks.push({ id, name: task?.name ? String(task.name) : undefined })
+    }
+    return tasks
+  } catch {
+    return []
+  }
+}
+
+const getPingTaskName = (taskId: number, tasks: PingTask[], fallback?: unknown): string => {
+  const task = tasks.find((item) => toTaskId(item.id) === taskId)
+  return task?.name || (typeof fallback === "string" && fallback.trim() ? fallback : `task_${taskId}`)
+}
+
+const buildMonitorSeries = (result: PingResult | PingRecord[], serverId: number, serverName: string): NezhaMonitor[] => {
+  const tasks = Array.isArray(result) ? [] : Array.isArray(result?.tasks) ? result.tasks : []
+  const records = Array.isArray(result) ? result : Array.isArray(result?.records) ? result.records : []
+  const seriesByTask = new Map<number, NezhaMonitor>()
+
+  for (const task of tasks) {
+    const taskId = toTaskId(task.id)
+    if (taskId === null) continue
+    seriesByTask.set(taskId, {
+      monitor_id: taskId,
+      monitor_name: task.name || `task_${taskId}`,
+      server_id: serverId,
+      server_name: serverName,
+      created_at: [],
+      avg_delay: [],
+    })
+  }
+
+  for (const record of records) {
+    const taskId = toTaskId(record.task_id) ?? 0
+    if (!seriesByTask.has(taskId)) {
+      seriesByTask.set(taskId, {
+        monitor_id: taskId,
+        monitor_name: getPingTaskName(taskId, tasks, (record as PingRecord & { name?: string }).name),
+        server_id: serverId,
+        server_name: serverName,
+        created_at: [],
+        avg_delay: [],
+      })
+    }
+
+    const time = Date.parse(String(record.time || ""))
+    const value = Number(record.value)
+    if (!Number.isFinite(time) || !Number.isFinite(value)) continue
+
+    const series = seriesByTask.get(taskId)!
+    series.created_at.push(time)
+    series.avg_delay.push(value)
+  }
+
+  const fullData = Array.from(seriesByTask.values()).map((series) => {
+    const points = series.created_at
+      .map((time, index) => ({ time, value: series.avg_delay[index] }))
+      .sort((a, b) => a.time - b.time)
+    const rawValues = points.map((point) => point.value)
+
+    // 负值代表 Ping 失败，保留为丢包信号并用上一个正常值绘制延迟曲线。
+    const packetLoss: number[] = []
+    const delays: number[] = []
+    let lastGood = 0
+    let ema = 0
+    for (const value of rawValues) {
+      const lost = value < 0
+      ema = 0.3 * (lost ? 100 : 0) + 0.7 * ema
+      packetLoss.push(Number(ema.toFixed(2)))
+      if (!lost) {
+        lastGood = value
+      }
+      delays.push(lost ? lastGood : value)
+    }
+
+    return {
+      ...series,
+      created_at: points.map((point) => point.time),
+      avg_delay: delays,
+      packet_loss: packetLoss,
+    }
+  })
+
+  return alignAndDownsampleMonitorSeries(fullData)
+}
+
+const fetchMetricPingSeries = async (uuid: string, hours: number, serverId: number, serverName: string): Promise<NezhaMonitor[] | null> => {
+  try {
+    const result: any = await SharedClient().call("public:queryMetrics", {
+      metric_key: "ping.latency_ms",
+      entity_id: uuid,
+      hours,
+      downsample: true,
+      fill_empty: false,
+      max_points: MONITOR_TARGET_POINTS,
+      aggregation: "avg",
+    })
+
+    const series = Array.isArray(result?.series) ? result.series : []
+    const taskDefinitions = await getPublicPingTasks()
+    const taskNames = new Map(taskDefinitions.map((task) => [toTaskId(task.id), task.name]))
+    const taskOrder = new Map(taskDefinitions.map((task, index) => [toTaskId(task.id), index]))
+    const monitors = series.flatMap((item: any, index: number) => {
+      const points = Array.isArray(item?.points) ? item.points : []
+      const taskId = toTaskId(item?.tags?.task_id ?? item?.tag?.task_id ?? item?.labels?.task_id)
+      const monitorId = taskId ?? -(index + 1)
+      const monitorName = String(item?.tags?.name ?? item?.tag?.name ?? item?.labels?.name ?? taskNames.get(monitorId) ?? `task_${monitorId}`)
+      let lastGood = 0
+      let ema = 0
+      const createdAt: number[] = []
+      const delays: number[] = []
+      const packetLoss: number[] = []
+
+      for (const point of points) {
+        const time = Date.parse(String(point?.time || ""))
+        if (!Number.isFinite(time)) continue
+        const value = point?.value === null || point?.value === undefined ? -1 : Number(point.value)
+        if (!Number.isFinite(value)) continue
+        const lost = value < 0
+        ema = 0.3 * (lost ? 100 : 0) + 0.7 * ema
+        createdAt.push(time)
+        packetLoss.push(Number(ema.toFixed(2)))
+        if (!lost) lastGood = value
+        delays.push(lost ? lastGood : value)
+      }
+
+      if (createdAt.length === 0) return []
+      return [{
+        monitor_id: monitorId,
+        monitor_name: monitorName,
+        server_id: serverId,
+        server_name: serverName,
+        created_at: createdAt,
+        avg_delay: delays,
+        packet_loss: packetLoss,
+      } satisfies NezhaMonitor]
+    })
+
+    monitors.sort((a: NezhaMonitor, b: NezhaMonitor) => {
+      const aOrder = taskOrder.get(a.monitor_id) ?? Number.MAX_SAFE_INTEGER
+      const bOrder = taskOrder.get(b.monitor_id) ?? Number.MAX_SAFE_INTEGER
+      return aOrder - bOrder || a.monitor_id - b.monitor_id
+    })
+
+    return monitors.length > 0 ? alignAndDownsampleMonitorSeries(monitors) : null
+  } catch {
+    // 1.2.6 之前没有 Metric API，调用方会回退到 Ping records。
+    return null
+  }
+}
+
 export const fetchServerGroup = async (): Promise<ServerGroupResponse> => {
   const kmNodes: Record<string, any> = await getKomariNodes()
 
@@ -171,105 +374,9 @@ export const fetchMonitor = async (server_id: number, hours: number = 24): Promi
   }
   const serverName = km_nodes[uuid]?.name || String(server_id)
 
-  // maxCount: -1 获取全量数据，确保丢包记录不会被后端采样丢弃
-  const km_monitors: any = await SharedClient().call("common:getRecords", {
-    type: "ping",
-    uuid: uuid,
-    maxCount: -1,
-    hours,
-  })
-
-  // 将 km_monitors 转换为 NezhaMonitor[]
-  const seriesByTask = new Map<number, NezhaMonitor>()
-
-  if (km_monitors && Array.isArray(km_monitors.tasks) && Array.isArray(km_monitors.records)) {
-    for (const task of km_monitors.tasks) {
-      seriesByTask.set(task.id, {
-        monitor_id: task.id,
-        monitor_name: task.name,
-        server_id,
-        server_name: serverName,
-        created_at: [],
-        avg_delay: [],
-      })
-    }
-
-    for (const rec of km_monitors.records) {
-      const s = seriesByTask.get(rec.task_id)
-      if (!s) continue
-      const ts = Date.parse(rec.time)
-      if (!Number.isFinite(ts)) continue
-      const val = Number(rec.value)
-      if (!Number.isFinite(val)) continue
-      // 保留 -1（丢包）记录，用于计算真实丢包率
-      s.created_at.push(ts)
-      s.avg_delay.push(val)
-    }
-  } else if (Array.isArray(km_monitors)) {
-    // 可能是纯 records 数组 [{ task_id, time, value, name? }]
-    for (const rec of km_monitors) {
-      const id: number = typeof rec.task_id === "number" ? rec.task_id : 0
-      const name: string = rec.name || `task_${id}`
-      if (!seriesByTask.has(id)) {
-        seriesByTask.set(id, {
-          monitor_id: id,
-          monitor_name: name,
-          server_id,
-          server_name: serverName,
-          created_at: [],
-          avg_delay: [],
-        })
-      }
-      const s = seriesByTask.get(id)!
-      const ts = Date.parse(rec.time)
-      if (!Number.isFinite(ts)) continue
-      const val = Number(rec.value)
-      if (!Number.isFinite(val)) continue
-      s.created_at.push(ts)
-      s.avg_delay.push(val)
-    }
-  } else {
-    // 未知结构，返回空
-  }
-
-  // 每个序列按时间升序，并计算真实丢包率
-  const fullData = Array.from(seriesByTask.values()).map((s) => {
-    const zip = s.created_at.map((t, i) => ({ t, v: s.avg_delay[i] }))
-    zip.sort((a, b) => a.t - b.t)
-
-    const rawVals = zip.map((z) => z.v)
-
-    // 计算真实丢包率：单向 EMA，丢包点快速升高后自然衰减
-    const rawLoss = rawVals.map((v) => (v === -1 ? 100 : 0))
-    const alpha = 0.3
-    const packetLoss: number[] = []
-    let ema = 0
-    for (let i = 0; i < rawLoss.length; i++) {
-      ema = alpha * rawLoss[i] + (1 - alpha) * ema
-      packetLoss.push(Number(ema.toFixed(2)))
-    }
-
-    // 对延迟数据：将 -1 替换为上一个正常值（平滑显示）
-    const delays: number[] = []
-    let lastGood = 0
-    for (const v of rawVals) {
-      if (v >= 0) {
-        lastGood = v
-        delays.push(v)
-      } else {
-        delays.push(lastGood)
-      }
-    }
-
-    return {
-      ...s,
-      created_at: zip.map((z) => z.t),
-      avg_delay: delays,
-      packet_loss: packetLoss,
-    }
-  })
-
-  const data = alignAndDownsampleMonitorSeries(fullData)
+  // 新版 Metric API 才会真正按 hours 查询；public:getPingRecords 只返回最新缓存记录。
+  const metricData = await fetchMetricPingSeries(uuid, hours, server_id, serverName)
+  const data = metricData || buildMonitorSeries(await getPingRecords(uuid, hours), server_id, serverName)
 
   // 避免空的 avg_delay
   for (const s of data) {
@@ -364,33 +471,39 @@ export const fetchServerUptime = async (): Promise<ServiceResponse> => {
 }
 
 export const fetchService = async (): Promise<ServiceResponse> => {
-  // 按 UUID 逐个查询，使用 HTTP 避免阻塞 WebSocket
+  // 按 UUID 逐个查询，公开接口优先，自动兼容旧版 RPC 返回结构。
   // 每次查询单个 UUID 数据量小，不会拖慢后端
   const kmNodes: Record<string, any> = await getKomariNodes()
   const uuids = Object.keys(kmNodes || {})
 
-  const allTasks: any[] = []
-  let allRecords: any[] = []
+  const allTasks: Array<{ id: number; name?: string }> = []
+  const allRecords: Array<PingRecord & { task_id: number }> = []
   const seenTaskIds = new Set<number>()
 
   // 逐个查询，避免并发请求压垮后端
   for (const uuid of uuids) {
     try {
-      const result = await SharedClient().callViaHTTP("common:getRecords", {
-        type: "ping",
-        uuid,
-        hours: 720,
-        maxCount: 300,
-      })
-      const tasks: any[] = result?.tasks || []
-      const records: any[] = result?.records || []
+      const result = await getPingRecords(uuid, 720, true)
+      const tasks = Array.isArray(result?.tasks) ? result.tasks : []
+      const records = Array.isArray(result?.records) ? result.records : []
       for (const t of tasks) {
-        if (!seenTaskIds.has(t.id)) {
-          seenTaskIds.add(t.id)
-          allTasks.push(t)
+        const taskId = toTaskId(t.id)
+        if (taskId !== null && !seenTaskIds.has(taskId)) {
+          seenTaskIds.add(taskId)
+          allTasks.push({ id: taskId, name: t.name })
         }
       }
-      allRecords = allRecords.concat(records)
+
+      for (const record of records) {
+        const taskId = toTaskId(record.task_id)
+        if (taskId === null) continue
+        // common:getRecords 没有 tasks 时，从 records 反推一个可展示的任务。
+        if (!seenTaskIds.has(taskId)) {
+          seenTaskIds.add(taskId)
+          allTasks.push({ id: taskId, name: `Task ${taskId}` })
+        }
+        allRecords.push({ ...record, task_id: taskId })
+      }
     } catch {
       // 单个节点失败不影响整体
     }
@@ -410,7 +523,7 @@ export const fetchService = async (): Promise<ServiceResponse> => {
 
     for (const rec of allRecords) {
       if (rec.task_id !== taskId) continue
-      const ts = Date.parse(rec.time)
+      const ts = Date.parse(String(rec.time || ""))
       if (!Number.isFinite(ts)) continue
       const dayIndex = 29 - Math.floor((now - ts) / DAY_MS)
       if (dayIndex < 0 || dayIndex > 29) continue
@@ -448,6 +561,60 @@ export const fetchService = async (): Promise<ServiceResponse> => {
   }
 }
 
+const getPublicInfo = async (): Promise<any> => {
+  // 官方新版前端使用 /api/public，私有站点访客也能读取主题配置。
+  try {
+    const response = await fetch("/api/public", { credentials: "same-origin" })
+    if (response.ok) {
+      const payload: any = await response.json()
+      const info = payload?.data?.data ?? payload?.data ?? payload
+      if (info && typeof info === "object" && !Array.isArray(info) && !info.error) {
+        return info
+      }
+    }
+  } catch {
+    // 回退到 RPC，兼容旧版 Komari 或自定义反向代理。
+  }
+
+  const info = await SharedClient().call("common:getPublicInfo")
+  if (info?.error) throw new Error(info.error)
+  return info
+}
+
+const getVersionInfo = async (): Promise<any> => {
+  try {
+    const version = await SharedClient().call("public:getVersion")
+    if (version?.version) return version
+  } catch {
+    // 旧版没有 public:getVersion 时回退。
+  }
+  return SharedClient().call("common:getVersion")
+}
+
+export const fetchPingRetentionHours = async (): Promise<number | null> => {
+  try {
+    const definitions: any = await SharedClient().call("public:listMetricDefinitions")
+    const pingRetentions = (Array.isArray(definitions) ? definitions : [])
+      .filter((item: any) => item?.name === "ping.latency_ms" || item?.name === "ping.loss")
+      .map((item: any) => Number(item.retention_days) * 24)
+      .filter((hours: number) => Number.isFinite(hours) && hours > 0)
+
+    if (pingRetentions.length > 0) {
+      return Math.min(...pingRetentions)
+    }
+  } catch {
+    // 旧版没有 Metric API 时使用站点 Ping 记录保留时长。
+  }
+
+  try {
+    const publicInfo = await getPublicInfo()
+    const hours = Number(publicInfo?.ping_record_preserve_time)
+    return Number.isFinite(hours) && hours > 0 ? hours : null
+  } catch {
+    return null
+  }
+}
+
 export const updateThemeSetting = async (key: string, value: unknown): Promise<void> => {
   const win = window as unknown as Record<string, unknown>
   const current = (win.__themeSettings as Record<string, unknown>) || {}
@@ -465,10 +632,7 @@ export const updateThemeSetting = async (key: string, value: unknown): Promise<v
 }
 
 export const fetchSetting = async (): Promise<SettingResponse> => {
-  const km_public = await SharedClient().call("common:getPublicInfo")
-  if (km_public.error) {
-    throw new Error(km_public.error)
-  }
+  const km_public = await getPublicInfo()
   // Apply managed theme configuration to window.* variables
   const themeSettings = km_public.theme_settings
   if (themeSettings && typeof themeSettings === "object") {
@@ -477,7 +641,7 @@ export const fetchSetting = async (): Promise<SettingResponse> => {
       ;(window as unknown as Record<string, unknown>)[key] = value
     }
   }
-  const km_version = await SharedClient().call("common:getVersion")
+  const km_version = await getVersionInfo()
   const km_data: SettingResponse = {
     success: true,
     data: {

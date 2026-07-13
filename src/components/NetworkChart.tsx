@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { fetchMonitor } from "@/lib/nezha-api"
+import { fetchMonitor, fetchPingRetentionHours } from "@/lib/nezha-api"
 import { cn, formatTime } from "@/lib/utils"
 import { MonitorResponse, NezhaMonitor, ServerMonitorChart } from "@/types/nezha-api"
 import { useQuery } from "@tanstack/react-query"
@@ -78,14 +78,38 @@ const calculatePacketLoss = (delays: number[]): number[] => {
   return packetLossRates.map((rate) => Number(rate.toFixed(2)))
 }
 
-const TIME_OPTIONS = [
-  { value: "1", label: "1h" },
-  { value: "6", label: "6h" },
-  { value: "12", label: "12h" },
-  { value: "24", label: "24h" },
-  { value: "72", label: "3d" },
-  { value: "168", label: "7d" },
+type TimeOption = {
+  hours: number
+  label: string
+}
+
+const BASE_TIME_OPTIONS: TimeOption[] = [
+  { hours: 1, label: "1h" },
+  { hours: 12, label: "12h" },
+  { hours: 24, label: "24h" },
+  { hours: 72, label: "3d" },
+  { hours: 168, label: "7d" },
+  { hours: 720, label: "30d" },
 ]
+
+const formatRetentionLabel = (hours: number): string => {
+  if (hours % 24 === 0) return `${hours / 24}d`
+  if (hours > 24) return `${Math.floor(hours / 24)}d${hours % 24}h`
+  return `${hours}h`
+}
+
+const buildTimeOptions = (retentionHours?: number | null): TimeOption[] => {
+  const retention = Number(retentionHours)
+  if (!Number.isFinite(retention) || retention <= 0) return BASE_TIME_OPTIONS
+
+  const maxHours = Math.max(1, Math.floor(retention))
+  const options = BASE_TIME_OPTIONS.filter((option) => option.hours <= maxHours)
+  if (!options.some((option) => option.hours === maxHours)) {
+    options.push({ hours: maxHours, label: formatRetentionLabel(maxHours) })
+  }
+
+  return options.sort((a, b) => a.hours - b.hours)
+}
 
 export function NetworkChart({
   server_id,
@@ -98,7 +122,15 @@ export function NetworkChart({
 }) {
   const { t } = useTranslation()
   const [hours, setHours] = React.useState(24)
-  const queryHours = hours <= 24 ? 24 : hours
+  const { data: pingRetentionHours } = useQuery({
+    queryKey: ["ping-retention-hours"],
+    queryFn: fetchPingRetentionHours,
+    enabled: show,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+  const timeOptions = useMemo(() => buildTimeOptions(pingRetentionHours), [pingRetentionHours])
+  const queryHours = hours
 
   const { data: fetchedMonitorData } = useQuery({
     queryKey: ["monitor", server_id, queryHours],
@@ -113,6 +145,14 @@ export function NetworkChart({
   React.useEffect(() => {
     setHours(24)
   }, [server_id])
+
+  React.useEffect(() => {
+    const availableHours = timeOptions.map((option) => option.hours)
+    if (availableHours.includes(hours)) return
+
+    const nextHours = availableHours.includes(24) ? 24 : Math.max(...availableHours)
+    setHours(nextHours)
+  }, [hours, timeOptions])
 
   const monitorData = useMemo(() => (fetchedMonitorData ? filterMonitorData(fetchedMonitorData, hours) : null), [fetchedMonitorData, hours])
   const hasMonitorData = fetchedMonitorData?.success ? Boolean(fetchedMonitorData.data?.length) : undefined
@@ -159,6 +199,7 @@ export function NetworkChart({
       serverName={monitorData.data[0].server_name}
       formattedData={formattedData}
       hours={hours}
+      timeOptions={timeOptions}
       onHoursChange={setHours}
     />
   )
@@ -171,6 +212,7 @@ export const NetworkChartClient = React.memo(function NetworkChart({
   serverName,
   formattedData,
   hours,
+  timeOptions,
   onHoursChange,
 }: {
   chartDataKey: string[]
@@ -179,6 +221,7 @@ export const NetworkChartClient = React.memo(function NetworkChart({
   serverName: string
   formattedData: ResultItem[]
   hours: number
+  timeOptions: TimeOption[]
   onHoursChange: (hours: number) => void
 }) {
   const { t } = useTranslation()
@@ -455,8 +498,8 @@ export const NetworkChartClient = React.memo(function NetworkChart({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TIME_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-xs">
+                {timeOptions.map((opt) => (
+                  <SelectItem key={opt.hours} value={String(opt.hours)} className="text-xs">
                     {opt.label}
                   </SelectItem>
                 ))}
