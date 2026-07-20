@@ -174,6 +174,35 @@ const getPingTaskName = (taskId: number, tasks: PingTask[], fallback?: unknown):
   return task?.name || (typeof fallback === "string" && fallback.trim() ? fallback : `task_${taskId}`)
 }
 
+type MetricPointValue = {
+  time: number
+  value: number | null
+}
+
+const getMetricTaskId = (series: any): number | null =>
+  toTaskId(series?.tags?.task_id ?? series?.tag?.task_id ?? series?.labels?.task_id)
+
+const parseMetricPoints = (series: any, resultEnd: unknown): MetricPointValue[] => {
+  const endTime = Date.parse(String(resultEnd || ""))
+  const points = Array.isArray(series?.points) ? series.points : []
+
+  return points
+    .flatMap((point: any) => {
+      const time = Date.parse(String(point?.time || ""))
+      if (!Number.isFinite(time)) return []
+
+      const value = point?.value === null || point?.value === undefined ? null : Number(point.value)
+      if (value !== null && !Number.isFinite(value)) return []
+
+      // fill_empty adds a null point exactly at the query end while the next
+      // sampling bucket has not produced a value yet. It is not a failed ping.
+      if (value === null && Number.isFinite(endTime) && time === endTime) return []
+
+      return [{ time, value }]
+    })
+    .sort((a: MetricPointValue, b: MetricPointValue) => a.time - b.time)
+}
+
 const buildMonitorSeries = (result: PingResult | PingRecord[], serverId: number, serverName: string): NezhaMonitor[] => {
   const tasks = Array.isArray(result) ? [] : Array.isArray(result?.tasks) ? result.tasks : []
   const records = Array.isArray(result) ? result : Array.isArray(result?.records) ? result.records : []
@@ -216,7 +245,7 @@ const buildMonitorSeries = (result: PingResult | PingRecord[], serverId: number,
 
   const fullData = Array.from(seriesByTask.values()).map((series) => {
     const points = series.created_at
-      .map((time, index) => ({ time, value: series.avg_delay[index] }))
+      .map((time, index) => ({ time, value: series.avg_delay[index] ?? 0 }))
       .sort((a, b) => a.time - b.time)
     const rawValues = points.map((point) => point.value)
 
@@ -248,43 +277,61 @@ const buildMonitorSeries = (result: PingResult | PingRecord[], serverId: number,
 
 const fetchMetricPingSeries = async (uuid: string, hours: number, serverId: number, serverName: string): Promise<NezhaMonitor[] | null> => {
   try {
-    const result: any = await SharedClient().call("public:queryMetrics", {
+    const client = SharedClient()
+    const result: any = await client.call("public:queryMetrics", {
       metric_key: "ping.latency_ms",
       entity_id: uuid,
       hours,
       downsample: true,
-      fill_empty: false,
+      fill_empty: true,
       max_points: MONITOR_TARGET_POINTS,
       aggregation: "avg",
     })
 
     const series = Array.isArray(result?.series) ? result.series : []
+    let lossResult: any = null
+    try {
+      lossResult = await client.call("public:queryMetrics", {
+        metric_key: "ping.loss",
+        entity_id: uuid,
+        hours,
+        downsample: true,
+        fill_empty: true,
+        max_points: MONITOR_TARGET_POINTS,
+        aggregation: "avg",
+      })
+    } catch {
+      // Older Komari versions may expose latency without ping.loss.
+    }
+
+    const lossSeries = Array.isArray(lossResult?.series) ? lossResult.series : []
+    const lossPointsByTask = new Map<number, Map<number, number | null>>()
+    const lossPointsByIndex = new Map<number, Map<number, number | null>>()
+    lossSeries.forEach((item: any, index: number) => {
+      const points = new Map(parseMetricPoints(item, lossResult?.end).map((point) => [point.time, point.value]))
+      const taskId = getMetricTaskId(item)
+      if (taskId !== null) lossPointsByTask.set(taskId, points)
+      lossPointsByIndex.set(index, points)
+    })
+
     const taskDefinitions = await getPublicPingTasks()
     const taskNames = new Map(taskDefinitions.map((task) => [toTaskId(task.id), task.name]))
     const taskOrder = new Map(taskDefinitions.map((task, index) => [toTaskId(task.id), index]))
     const monitors = series.flatMap((item: any, index: number) => {
-      const points = Array.isArray(item?.points) ? item.points : []
-      const taskId = toTaskId(item?.tags?.task_id ?? item?.tag?.task_id ?? item?.labels?.task_id)
+      const points = parseMetricPoints(item, result?.end)
+      const taskId = getMetricTaskId(item)
       const monitorId = taskId ?? -(index + 1)
       const monitorName = String(item?.tags?.name ?? item?.tag?.name ?? item?.labels?.name ?? taskNames.get(monitorId) ?? `task_${monitorId}`)
-      let lastGood = 0
-      let ema = 0
-      const createdAt: number[] = []
-      const delays: number[] = []
-      const packetLoss: number[] = []
+      const lossPoints = taskId === null ? lossPointsByIndex.get(index) : lossPointsByTask.get(taskId) ?? lossPointsByIndex.get(index)
+      const createdAt = points.map((point) => point.time)
+      const delays = points.map((point) => (point.value === null || point.value < 0 ? null : point.value))
+      const packetLoss = points.map((point) => {
+        const lossRatio = lossPoints?.get(point.time)
+        if (typeof lossRatio !== "number") return null
 
-      for (const point of points) {
-        const time = Date.parse(String(point?.time || ""))
-        if (!Number.isFinite(time)) continue
-        const value = point?.value === null || point?.value === undefined ? -1 : Number(point.value)
-        if (!Number.isFinite(value)) continue
-        const lost = value < 0
-        ema = 0.3 * (lost ? 100 : 0) + 0.7 * ema
-        createdAt.push(time)
-        packetLoss.push(Number(ema.toFixed(2)))
-        if (!lost) lastGood = value
-        delays.push(lost ? lastGood : value)
-      }
+        // Komari stores ping.loss as a ratio (0..1), while the theme displays %.
+        return Number((Math.max(0, Math.min(1, lossRatio)) * 100).toFixed(2))
+      })
 
       if (createdAt.length === 0) return []
       return [{
@@ -304,7 +351,9 @@ const fetchMetricPingSeries = async (uuid: string, hours: number, serverId: numb
       return aOrder - bOrder || a.monitor_id - b.monitor_id
     })
 
-    return monitors.length > 0 ? alignAndDownsampleMonitorSeries(monitors) : null
+    // Metric API 已经按 max_points 下采样；保留内部空点用于画断线，过滤查询结束占位点。
+    // 丢包率使用 ping.loss，不再从延迟空点推导。
+    return monitors.length > 0 ? monitors : null
   } catch {
     // 1.2.6 之前没有 Metric API，调用方会回退到 Ping records。
     return null
@@ -594,13 +643,18 @@ const getVersionInfo = async (): Promise<any> => {
 export const fetchPingRetentionHours = async (): Promise<number | null> => {
   try {
     const definitions: any = await SharedClient().call("public:listMetricDefinitions")
-    const pingRetentions = (Array.isArray(definitions) ? definitions : [])
-      .filter((item: any) => item?.name === "ping.latency_ms" || item?.name === "ping.loss")
-      .map((item: any) => Number(item.retention_days) * 24)
-      .filter((hours: number) => Number.isFinite(hours) && hours > 0)
+    if (Array.isArray(definitions)) {
+      const pingDefinitions = definitions.filter((item: any) => item?.name === "ping.latency_ms" || item?.name === "ping.loss")
+      const pingRetentions = pingDefinitions
+        .map((item: any) => Number(item.retention_days) * 24)
+        .filter((hours: number) => Number.isFinite(hours) && hours >= 0)
 
-    if (pingRetentions.length > 0) {
-      return Math.min(...pingRetentions)
+      if (pingRetentions.length > 0) {
+        return Math.min(...pingRetentions)
+      }
+
+      // 新版接口明确返回了指标定义但没有可用的 Ping 保留数据，不能再回退到旧版的宽泛设置。
+      if (pingDefinitions.length > 0) return 0
     }
   } catch {
     // 旧版没有 Metric API 时使用站点 Ping 记录保留时长。
