@@ -283,11 +283,19 @@ export const NetworkChartClient = React.memo(function NetworkChart({
         const monitorData = chartData[key]
         const lastDelay = [...monitorData].reverse().find((item) => typeof item.avg_delay === "number")?.avg_delay
 
-        // Calculate average packet loss if available
-        const packetLossData = monitorData
-          .map((item) => item.packet_loss)
-          .filter((loss): loss is number => typeof loss === "number")
-        const avgPacketLoss = packetLossData.length > 0 ? packetLossData.reduce((sum, loss) => sum + loss, 0) / packetLossData.length : null
+        // Metric API 的 packet_loss 是按采样桶聚合的，使用桶内样本数加权。
+        const packetLossStats = monitorData.reduce(
+          (stats, item) => {
+            if (typeof item.packet_loss !== "number") return stats
+            const weight = typeof item.sample_count === "number" && item.sample_count > 0 ? item.sample_count : 1
+            return {
+              weightedLoss: stats.weightedLoss + item.packet_loss * weight,
+              weight: stats.weight + weight,
+            }
+          },
+          { weightedLoss: 0, weight: 0 },
+        )
+        const avgPacketLoss = packetLossStats.weight > 0 ? packetLossStats.weightedLoss / packetLossStats.weight : null
 
         return (
           <button
@@ -647,6 +655,7 @@ const transformData = (data: NezhaMonitor[]) => {
         created_at: item.created_at[i],
         avg_delay: item.avg_delay[i],
         packet_loss: packetLoss[i],
+        sample_count: item.sample_count?.[i],
       })
     }
   })

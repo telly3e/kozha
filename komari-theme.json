@@ -89,6 +89,13 @@
                 "help": "开启后服务器卡片使用紧凑的行内布局模式。"
             },
             {
+                "key": "GroupOrder",
+                "name": "分组显示顺序",
+                "type": "string",
+                "default": "",
+                "help": "自定义首页分组顺序，All 固定最前。支持逗号/换行分隔或 JSON 数组，例如 香港,日本,美国。未列出的分组会按名称排在后面。"
+            },
+            {
                 "key": "DisableAnimatedMan",
                 "name": "禁用动画插图",
                 "type": "switch",
