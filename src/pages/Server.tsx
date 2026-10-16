@@ -17,7 +17,6 @@ import { useWebSocketContext } from "@/hooks/use-websocket-context"
 import { fetchServerGroup } from "@/lib/nezha-api"
 import { ALL_REGIONS, canShowRegionFlag, getRegionOptions, getServerRegionCode } from "@/lib/region"
 import { cn, formatNezhaInfo } from "@/lib/utils"
-import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import { ServerGroup } from "@/types/nezha-api"
 import { ArrowDownIcon, ArrowUpIcon, ArrowsUpDownIcon, ChartBarSquareIcon, MapIcon, MapPinIcon, ViewColumnsIcon } from "@heroicons/react/20/solid"
 import { useQuery } from "@tanstack/react-query"
@@ -132,7 +131,7 @@ export default function Servers() {
     }
   }, [regionOpen])
 
-  const nezhaWsData = lastMessage ? (JSON.parse(lastMessage.data) as NezhaWebsocketResponse) : null
+  const nezhaWsData = lastMessage
 
   const groupTabs = [
     "All",

@@ -8,6 +8,11 @@ import { useTranslation } from "react-i18next"
 
 import MapTooltip from "./MapTooltip"
 
+// 地图数据只在模块加载时解析一次，避免每次 WS 刷新都重新解析近 1MB 的 GeoJSON
+const filteredFeatures = JSON.parse(geoJsonString).features.filter(
+  (feature: { properties: { iso_a3_eh: string } }) => feature.properties.iso_a3_eh !== "",
+)
+
 export default function GlobalMap({ serverList, now }: { serverList: NezhaServer[]; now: number }) {
   const { t } = useTranslation()
   const countryList: string[] = []
@@ -27,9 +32,6 @@ export default function GlobalMap({ serverList, now }: { serverList: NezhaServer
 
   const width = 900
   const height = 500
-
-  const geoJson = JSON.parse(geoJsonString)
-  const filteredFeatures = geoJson.features.filter((feature: { properties: { iso_a3_eh: string } }) => feature.properties.iso_a3_eh !== "")
 
   return (
     <section

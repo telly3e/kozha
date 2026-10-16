@@ -5,7 +5,6 @@ import { useCommand } from "@/hooks/use-command"
 import { useTheme } from "@/hooks/use-theme"
 import { useWebSocketContext } from "@/hooks/use-websocket-context"
 import { formatNezhaInfo } from "@/lib/utils"
-import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import { Home, Moon, Sun, SunMoon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
@@ -20,7 +19,7 @@ export function DashCommand() {
 
   const { lastMessage, connected } = useWebSocketContext()
 
-  const nezhaWsData = lastMessage ? (JSON.parse(lastMessage.data) as NezhaWebsocketResponse) : null
+  const nezhaWsData = lastMessage
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

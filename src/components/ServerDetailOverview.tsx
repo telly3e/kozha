@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { useWebSocketContext } from "@/hooks/use-websocket-context"
 import { formatBytes } from "@/lib/format"
 import { cn, formatNezhaInfo } from "@/lib/utils"
-import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import countries from "i18n-iso-countries"
 import enLocale from "i18n-iso-countries/langs/en.json"
 import { useEffect, useState } from "react"
@@ -43,7 +42,7 @@ export default function ServerDetailOverview({ server_id }: { server_id: string 
     }
   }
 
-  const nezhaWsData = lastMessage ? (JSON.parse(lastMessage.data) as NezhaWebsocketResponse) : null
+  const nezhaWsData = lastMessage
 
   if (!nezhaWsData) {
     return <ServerDetailLoading />

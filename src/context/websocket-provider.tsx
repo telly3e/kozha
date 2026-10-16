@@ -1,5 +1,6 @@
 import { SharedClient } from "@/hooks/use-rpc2"
 import { getKomariNodes, komariToNezhaWebsocketResponse } from "@/lib/utils"
+import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import React, { useEffect, useRef, useState } from "react"
 
 import { WebSocketContext, WebSocketContextType } from "./websocket-context"
@@ -10,8 +11,8 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ url, children }) => {
-  const [lastMessage, setLastMessage] = useState<{ data: string } | null>(null)
-  const [messageHistory, setMessageHistory] = useState<{ data: string }[]>([]) // 新增历史消息状态
+  const [lastMessage, setLastMessage] = useState<NezhaWebsocketResponse | null>(null)
+  const [messageHistory, setMessageHistory] = useState<NezhaWebsocketResponse[]>([]) // 新增历史消息状态
   const [connected, setConnected] = useState(false)
   const [needReconnect, setNeedReconnect] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -22,9 +23,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ url, child
       .call("common:getNodesLatestStatus")
       .then((res) => {
         const nzwsres = komariToNezhaWebsocketResponse(res)
-        setLastMessage({ data: JSON.stringify(nzwsres) })
+        setLastMessage(nzwsres)
         setMessageHistory((prev) => {
-          const updated = [{ data: JSON.stringify(nzwsres) }, ...prev]
+          const updated = [nzwsres, ...prev]
           return updated.slice(0, 30)
         })
       })
