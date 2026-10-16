@@ -40,15 +40,36 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ url, child
       setConnected(true)
     })
 
-    intervalRef.current = setInterval(() => {
-      getData()
-    }, 2000)
+    const startPolling = () => {
+      if (intervalRef.current) return
+      intervalRef.current = setInterval(() => {
+        getData()
+      }, 2000)
+    }
 
-    return () => {
+    const stopPolling = () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
       }
+    }
+
+    // 标签页隐藏时暂停轮询，切回时立即刷新一次再恢复
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopPolling()
+      } else {
+        getData()
+        startPolling()
+      }
+    }
+
+    if (!document.hidden) startPolling()
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      stopPolling()
     }
   }, [])
 

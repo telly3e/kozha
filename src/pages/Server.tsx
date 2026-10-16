@@ -1,5 +1,4 @@
 import AssetSummaryWidget from "@/components/AssetSummaryWidget"
-import GlobalMap from "@/components/GlobalMap"
 import GroupSwitch from "@/components/GroupSwitch"
 import ServerFlag from "@/components/ServerFlag"
 import ServerCard from "@/components/ServerCard"
@@ -22,8 +21,11 @@ import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import { ServerGroup } from "@/types/nezha-api"
 import { ArrowDownIcon, ArrowUpIcon, ArrowsUpDownIcon, ChartBarSquareIcon, MapIcon, MapPinIcon, ViewColumnsIcon } from "@heroicons/react/20/solid"
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useRef, useState } from "react"
+import { Suspense, lazy, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+
+// 地图数据近 1MB，按需加载，关闭地图的站点访客无需下载
+const GlobalMap = lazy(() => import("@/components/GlobalMap"))
 
 export default function Servers() {
   const { t, i18n } = useTranslation()
@@ -485,7 +487,11 @@ export default function Servers() {
           </PopoverContent>
         </Popover>
       </div>
-      {showMap === "1" && <GlobalMap now={nezhaWsData.now} serverList={nezhaWsData?.servers || []} />}
+      {showMap === "1" && (
+        <Suspense fallback={null}>
+          <GlobalMap now={nezhaWsData.now} serverList={nezhaWsData?.servers || []} />
+        </Suspense>
+      )}
       {canShowServicesControl && showServices === "1" && <ServiceTracker serverList={filteredServers} />}
       {inline === "1" && (
         <section ref={containerRef} className="flex flex-col gap-2 overflow-x-scroll scrollbar-hidden mt-6 server-inline-list">
