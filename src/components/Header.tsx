@@ -9,7 +9,6 @@ import NumberFlow, { NumberFlowGroup } from "@number-flow/react"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, m } from "framer-motion"
 import { ImageMinus, LogIn } from "lucide-react"
-import { DateTime } from "luxon"
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router-dom"
@@ -272,21 +271,18 @@ function DashboardLink() {
   )
 }
 
+const getClockTime = () => {
+  const now = new Date()
+  return { hh: now.getHours(), mm: now.getMinutes(), ss: now.getSeconds() }
+}
+
 function Overview() {
   const { t } = useTranslation()
-  const [time, setTime] = useState({
-    hh: DateTime.now().setLocale("en-US").hour,
-    mm: DateTime.now().setLocale("en-US").minute,
-    ss: DateTime.now().setLocale("en-US").second,
-  })
+  const [time, setTime] = useState(getClockTime)
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setTime({
-        hh: DateTime.now().setLocale("en-US").hour,
-        mm: DateTime.now().setLocale("en-US").minute,
-        ss: DateTime.now().setLocale("en-US").second,
-      })
+      setTime(getClockTime())
     }, 1000)
 
     return () => clearInterval(timer)

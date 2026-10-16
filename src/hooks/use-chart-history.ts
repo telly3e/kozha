@@ -2,7 +2,7 @@ import { NezhaWebsocketResponse } from "@/types/nezha-api"
 import { useEffect, useState } from "react"
 
 export function useChartHistory<T>(
-  messageHistory: { data: string }[],
+  messageHistory: NezhaWebsocketResponse[],
   serverId: number,
   formatFn: (wsData: NezhaWebsocketResponse, serverId: number) => T | null,
 ) {
@@ -11,10 +11,7 @@ export function useChartHistory<T>(
   useEffect(() => {
     if (messageHistory.length > 0 && data.length === 0) {
       const historyData = messageHistory
-        .map((msg) => {
-          const wsData = JSON.parse(msg.data) as NezhaWebsocketResponse
-          return formatFn(wsData, serverId)
-        })
+        .map((wsData) => formatFn(wsData, serverId))
         .filter((item): item is T => item !== null)
         .reverse()
 
