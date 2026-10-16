@@ -1,6 +1,6 @@
 import { SharedClient } from "@/hooks/use-rpc2"
 import { LoginUserResponse, MonitorResponse, ServerGroupResponse, ServiceData, ServiceResponse, SettingResponse, NezhaMonitor } from "@/types/nezha-api"
-import { DateTime } from "luxon"
+import dayjs from "dayjs"
 
 import { getKomariNodes, uuidToNumber } from "./utils"
 
@@ -593,8 +593,8 @@ export const fetchServerGroup = async (): Promise<ServerGroupResponse> => {
       ...groups.map((group, index) => ({
         group: {
           id: index,
-          created_at: DateTime.now().toISO() || "",
-          updated_at: DateTime.now().toISO() || "",
+          created_at: dayjs().format(),
+          updated_at: dayjs().format(),
           name: group,
         },
         servers: Object.entries(kmNodes)
@@ -617,8 +617,8 @@ export const fetchLoginUser = async (): Promise<LoginUserResponse> => {
       id: uuidToNumber(km_me.uuid),
       username: km_me.username,
       password: "********",
-      created_at: DateTime.now().toISO() || "",
-      updated_at: DateTime.now().toISO() || "",
+      created_at: dayjs().format(),
+      updated_at: dayjs().format(),
     },
   }
   return data
